@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+cache/
+checkpoints/
+outputs/
+*.pt
+*.npy
+*.npz
