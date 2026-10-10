@@ -21,37 +21,40 @@ else:
     !git -C /content/DCC pull -q
 '''
 
-FIND_DATA = r'''# ② 데이터 폴더 찾기
+FIND_DATA = r'''# ② 데이터 폴더 지정 + 라벨(json)을 로컬 디스크로 병렬 복사
 #   공유 폴더 '대학부 데이터' 를 내 드라이브에 '바로가기 추가' 해 둔 경로. 다르면 DATA_ROOT 만 고쳐주세요.
-import glob, os, zipfile
+#   (Drive 는 파일 수가 많은 폴더를 읽는 게 느려서, 작은 json 은 32개씩 병렬로 로컬에 복사해 두고 사용.
+#    wav 는 학습에 쓰는 것만 학습 중에 Drive 에서 바로 읽음)
+import os, shutil, time
+from concurrent.futures import ThreadPoolExecutor
 DATA_ROOT = '/content/drive/MyDrive/2026 공모전/데이터+AI 크리에이터 캠프/대학부 데이터'
-if not os.path.exists(DATA_ROOT):
-    cands = glob.glob('/content/drive/MyDrive/*/*/대학부 데이터') + glob.glob('/content/drive/MyDrive/*/대학부 데이터')
-    DATA_ROOT = cands[0] if cands else DATA_ROOT
-print('DATA_ROOT =', DATA_ROOT, os.path.exists(DATA_ROOT))
-
-def find_dir(prefix):
-    """TS_/TL_/VS_/VL_ 로 시작하는 폴더(또는 zip) 경로 반환. (Drive 는 재귀 탐색이 매우 느려서 깊이 3까지만 확인)
-    zip 이면 로컬 디스크에 압축 해제."""
-    hits = []
-    for depth in ('', '*/', '*/*/', '*/*/*/'):
-        hits += sorted(glob.glob(f'{DATA_ROOT}/{depth}{prefix}*'))
-    for h in hits:
-        if os.path.isdir(h):
-            return h
-    for h in hits:
-        if h.endswith('.zip'):
-            dst = f'/content/data/{os.path.basename(h)[:-4]}'
-            if not os.path.exists(dst):
-                print('unzip', h); zipfile.ZipFile(h).extractall(dst)
-            return dst
-    return None
-
-TRAIN_WAV, TRAIN_JSON = find_dir('TS_'), find_dir('TL_')
-VAL_WAV, VAL_JSON = find_dir('VS_'), find_dir('VL_')
+TRAIN_WAV  = f'{DATA_ROOT}/Training/1.원천데이터/TS_서울_구급'
+TRAIN_JSON = f'{DATA_ROOT}/Training/2.라벨링데이터/TL_서울_구급'
+VAL_WAV    = f'{DATA_ROOT}/Validation/1.원천데이터/VS_서울_구급'
+VAL_JSON   = f'{DATA_ROOT}/Validation/2.라벨링데이터/VL_서울_구급'
 for k, v in dict(TRAIN_WAV=TRAIN_WAV, TRAIN_JSON=TRAIN_JSON, VAL_WAV=VAL_WAV, VAL_JSON=VAL_JSON).items():
-    sample = sorted(os.listdir(v))[:3] if v else []
-    print(f'{k:10s} {v}\n           예시: {sample}')
+    print(f'{k:10s} {os.path.exists(v)}  {v}')
+
+def local_copy(src, name, threads=32):
+    # src 폴더의 파일들을 /content/data/name 으로 병렬 복사 (이미 있는 파일은 건너뜀)
+    dst = f'/content/data/{name}'
+    os.makedirs(dst, exist_ok=True)
+    t0 = time.time()
+    files = os.listdir(src)
+    print(f'{name}: {len(files)} files 목록 읽기 {time.time()-t0:.0f}s')
+    def cp(fn):
+        d = os.path.join(dst, fn)
+        if not os.path.exists(d):
+            shutil.copyfile(os.path.join(src, fn), d)
+    with ThreadPoolExecutor(threads) as ex:
+        for i, _ in enumerate(ex.map(cp, files), 1):
+            if i % 5000 == 0:
+                print(f'  {i}/{len(files)}  ({time.time()-t0:.0f}s)')
+    print(f'{name}: 복사 완료 {time.time()-t0:.0f}s')
+    return dst
+
+TRAIN_JSON = local_copy(TRAIN_JSON, 'TL')
+VAL_JSON = local_copy(VAL_JSON, 'VL') if os.path.exists(VAL_JSON) else None
 '''
 
 SAVE = '''# ③ 설정
