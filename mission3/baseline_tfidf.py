@@ -5,6 +5,7 @@ Mission 3 참고용 베이스라인: 문자 n-gram TF-IDF + 클래스별 Logisti
 python baseline_tfidf.py --train_label_dir {TL json folder} --val_label_dir {VL json folder}
 """
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -15,7 +16,8 @@ from text_model import SYMPTOMS, THRESHOLD, dialogue_text, macro_f1, read_label,
 
 
 def load(label_dir):
-    labs = [read_label(p) for p in sorted(Path(label_dir).rglob("*.json"))]
+    with ThreadPoolExecutor(32) as ex:             # Drive 에서 병렬 읽기
+        labs = list(ex.map(read_label, sorted(Path(label_dir).rglob("*.json"))))
     return [dialogue_text(l) for l in labs], np.array([target_vector(l) for l in labs])
 
 

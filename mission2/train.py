@@ -11,6 +11,7 @@ Mission 2 학습: 발화 조각이 신고자(speaker=1)인지 119대원(speaker=
 import argparse
 import random
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -77,12 +78,15 @@ def sample_spans(spans, k, rng):
 def build_train_items(audio_dir, label_dir, per_call, seed=42, log=print):
     wavs, jsons = index_files(audio_dir, "wav"), index_files(label_dir, "json")
     rng = random.Random(seed)
+    stems = [s for s in wavs if s in jsons]
+    with ThreadPoolExecutor(32) as ex:              # Drive 에서 json 병렬 읽기
+        labels = dict(zip(stems, ex.map(lambda s: read_label(jsons[s]), stems)))
     items = []
     for stem, wp in wavs.items():
         jp = jsons.get(stem)
         if jp is None:
             continue
-        spans = sample_spans(utterance_spans(read_label(jp)), per_call, rng)
+        spans = sample_spans(utterance_spans(labels[stem]), per_call, rng)
         if spans:
             items.append((wp, jp.name, spans))
     log(f"wav {len(wavs)} / json {len(jsons)} / 학습 통화 {len(items)} / 조각 {sum(len(s) for *_, s in items)}")

@@ -8,6 +8,7 @@ Mission 1 학습: 음성으로부터 신고자 성별 분류
 """
 import argparse
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -70,12 +71,15 @@ def extract_features(pairs, encoder, num_workers=4, chunk=64, log=print):
 
 def labeled_pairs(audio_dir, label_dir, log=print):
     wavs, jsons = index_files(audio_dir, "wav"), index_files(label_dir, "json")
+    stems = [s for s in wavs if s in jsons]
+    with ThreadPoolExecutor(32) as ex:              # Drive 에서 json 병렬 읽기
+        labels = dict(zip(stems, ex.map(lambda s: read_label(jsons[s]), stems)))
     pairs, genders = [], []
     for stem, wp in wavs.items():
         jp = jsons.get(stem)
         if jp is None:
             continue
-        g = read_label(jp).get("gender")
+        g = labels[stem].get("gender")
         if g in (None, "", "미상"):
             continue
         pairs.append((wp, jp))

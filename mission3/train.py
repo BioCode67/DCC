@@ -9,6 +9,7 @@ import argparse
 import math
 import random
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -32,14 +33,17 @@ class DocDataset(Dataset):
 
 def load_docs(label_dir, tokenizer, args, log=print):
     paths = sorted(Path(label_dir).rglob("*.json"))
-    docs, names = [], []
-    for p in paths:
-        lab = read_label(p)
-        docs.append((make_windows(tokenizer, dialogue_text(lab), args.max_len, args.stride,
-                                  args.max_windows), target_vector(lab)))
-        names.append(p.name)
+    if args.limit and args.limit < len(paths):      # 무작위 부분 샘플 (읽기 전에 골라서 시간 절약)
+        keep = sorted(np.random.default_rng(args.seed).choice(len(paths), args.limit, replace=False))
+        paths = [paths[i] for i in keep]
+    t0 = time.time()
+    with ThreadPoolExecutor(32) as ex:             # Drive 에서 읽을 때 병렬로 (파일당 지연이 큼)
+        labels = list(ex.map(read_label, paths))
+    log(f"json {len(paths)}개 읽기 {time.time() - t0:.0f}s")
+    docs = [(make_windows(tokenizer, dialogue_text(lab), args.max_len, args.stride, args.max_windows),
+             target_vector(lab)) for lab in labels]
     log(f"{label_dir}: {len(docs)} docs, 평균 window {np.mean([len(w) for w, _ in docs]):.2f}")
-    return docs, names
+    return docs, [p.name for p in paths]
 
 
 @torch.no_grad()
@@ -65,9 +69,6 @@ def main(args, log=print):
 
     tokenizer = AutoTokenizer.from_pretrained(args.pretrained)
     docs, _ = load_docs(args.train_label_dir, tokenizer, args, log)
-    if args.limit and args.limit < len(docs):       # 무작위 부분 샘플
-        keep = sorted(np.random.default_rng(args.seed).choice(len(docs), args.limit, replace=False))
-        docs = [docs[i] for i in keep]
     Y = np.array([t for _, t in docs])
     log("클래스별 양성 수: " + ", ".join(f"{c} {int(n)}" for c, n in zip(SYMPTOMS, Y.sum(0))))
     log(f"증상 0개 문서 비율 {(Y.sum(1) == 0).mean():.3f}")
