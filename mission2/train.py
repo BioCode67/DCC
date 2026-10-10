@@ -95,8 +95,9 @@ def main(args, log=print):
     cache.mkdir(parents=True, exist_ok=True)
 
     items = build_train_items(args.train_audio_dir, args.train_label_dir, args.per_call, log=log)
-    if args.limit:
-        items = items[: args.limit]
+    if args.limit and args.limit < len(items):      # 무작위 부분 샘플 (무료 Colab 등 자원 제한 시)
+        keep = sorted(np.random.default_rng(42).choice(len(items), args.limit, replace=False))
+        items = [items[i] for i in keep]
 
     wavlm = load_pretrained_wavlm(args.pretrained)
     encoder = FrozenEncoder(wavlm, device)
@@ -135,7 +136,7 @@ def get_parser():
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--hidden", type=int, default=256)
     p.add_argument("--num_workers", type=int, default=4)
-    p.add_argument("--limit", type=int, default=0, help="디버그용: 앞에서 N개 통화만 사용")
+    p.add_argument("--limit", type=int, default=0, help="N개 통화만 무작위 샘플링해 사용 (0=전체)")
     return p
 
 

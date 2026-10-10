@@ -65,8 +65,9 @@ def main(args, log=print):
 
     tokenizer = AutoTokenizer.from_pretrained(args.pretrained)
     docs, _ = load_docs(args.train_label_dir, tokenizer, args, log)
-    if args.limit:
-        docs = docs[: args.limit]
+    if args.limit and args.limit < len(docs):       # 무작위 부분 샘플
+        keep = sorted(np.random.default_rng(args.seed).choice(len(docs), args.limit, replace=False))
+        docs = [docs[i] for i in keep]
     Y = np.array([t for _, t in docs])
     log("클래스별 양성 수: " + ", ".join(f"{c} {int(n)}" for c, n in zip(SYMPTOMS, Y.sum(0))))
     log(f"증상 0개 문서 비율 {(Y.sum(1) == 0).mean():.3f}")
@@ -151,7 +152,7 @@ def get_parser():
     p.add_argument("--pos_weight", type=int, default=1, help="1: 희소 클래스 pos_weight 사용")
     p.add_argument("--pos_weight_cap", type=float, default=5.0)
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--limit", type=int, default=0, help="디버그용: 앞에서 N개 문서만 사용")
+    p.add_argument("--limit", type=int, default=0, help="N개 문서만 무작위 샘플링해 사용 (0=전체)")
     return p
 
 

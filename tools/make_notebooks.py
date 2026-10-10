@@ -52,38 +52,54 @@ for k, v in dict(TRAIN_WAV=TRAIN_WAV, TRAIN_JSON=TRAIN_JSON, VAL_WAV=VAL_WAV, VA
     print(f'{k:10s} {v}  ({n} files)')
 '''
 
-SAVE = '''# ③ 결과 저장 위치 (런타임이 끊겨도 남도록 Drive 에 저장. 용량이 부족하면 /content/ckpt 로 바꾸고 직접 다운로드)
-SAVE_DIR = '/content/drive/MyDrive/DCC_outputs'
+SAVE = '''# ③ 설정
+#  - SAVE_DIR: 체크포인트/결과 저장 위치. 기본은 Colab 로컬 디스크(드라이브 용량 사용 안 함).
+#              런타임이 끊기면 사라지므로 마지막 셀에서 꼭 다운로드할 것.
+#              드라이브 여유가 1GB 이상이면 '/content/drive/MyDrive/DCC_outputs' 로 바꿔도 됨.
+#  - QUICK_TEST: 처음엔 200 으로 전체 흐름만 확인 → 문제 없으면 0 으로 바꿔 본 학습
+#  - LIMIT: 학습에 쓸 통화 수 (0=전체). 무료 Colab(T4, 시간 제한) 기준 권장값이 기본으로 들어가 있음.
+SAVE_DIR = '/content/ckpt'
 os.makedirs(SAVE_DIR, exist_ok=True)
-QUICK_TEST = 0   # 처음엔 200 정도로 전체 흐름만 확인 → 문제 없으면 0(전체 데이터)으로 다시 실행
+QUICK_TEST = 200
+LIMIT = {limit}
+N_LIMIT = QUICK_TEST or LIMIT
+WORKERS = str(min(8, os.cpu_count()))
+'''
+
+DOWNLOAD = '''# [마지막] 결과 다운로드 (런타임 종료 전에 꼭 실행!) — 체크포인트 + 결과 CSV 를 zip 으로 내려받기
+import shutil
+from google.colab import files
+zip_path = shutil.make_archive('/content/' + os.path.basename(os.getcwd()) + '_outputs', 'zip', SAVE_DIR)
+files.download(zip_path)
 '''
 
 INSTALL = '!pip -q install -r /content/DCC/mission{n}/requirements.txt'
 
 
-def audio_nb(n, title, extra_args):
+def audio_nb(n, title, extra_args, limit):
     return [
         nbf.v4.new_markdown_cell(f"# Mission {n}: {title}\n\n"
                                  "Colab(GPU) 에서 위에서부터 순서대로 실행하세요. 실행 로그가 그대로 학습 로그로 제출됩니다."),
         nbf.v4.new_code_cell(SETUP),
         nbf.v4.new_code_cell(INSTALL.format(n=n)),
         nbf.v4.new_code_cell(FIND_DATA),
-        nbf.v4.new_code_cell(SAVE),
+        nbf.v4.new_code_cell(SAVE.format(limit=limit)),
         nbf.v4.new_code_cell(f'''# ④ 학습 (WavLM 특징 추출 → MLP 헤드 학습, Training 폴더만 사용)
 import sys, time; sys.path.insert(0, '/content/DCC/mission{n}'); os.chdir('/content/DCC/mission{n}')
 import train
 args = train.get_parser().parse_args([
     '--train_audio_dir', TRAIN_WAV, '--train_label_dir', TRAIN_JSON,
     '--ckpt_path', f'{{SAVE_DIR}}/mission{n}.pt', '--cache_dir', '/content/cache',
-    '--num_workers', '8', '--limit', str(QUICK_TEST){extra_args}])
+    '--num_workers', WORKERS, '--limit', str(N_LIMIT){extra_args}])
 t0 = time.time(); train.main(args); print(f'총 학습 시간 {{time.time()-t0:.0f}}s')
 '''),
         nbf.v4.new_code_cell(f'''# ⑤ Validation 추론 (제출 명령어와 동일) + 채점 + 추론 시간 측정
 !cd /content/DCC/mission{n} && time python inference.py --audio_dir "$VAL_WAV" --label_dir "$VAL_JSON" \\
-    --ckpt_path "$SAVE_DIR/mission{n}.pt" --output ./outputs/mission{n}.csv --num_workers 8
+    --ckpt_path "$SAVE_DIR/mission{n}.pt" --output ./outputs/mission{n}.csv --num_workers $WORKERS
 !python /content/DCC/tools/evaluate.py --mission {n} --pred /content/DCC/mission{n}/outputs/mission{n}.csv --label_dir "$VAL_JSON"
 !cp /content/DCC/mission{n}/outputs/mission{n}.csv "$SAVE_DIR/"
 '''),
+        nbf.v4.new_code_cell(DOWNLOAD),
     ]
 
 
@@ -95,7 +111,7 @@ def text_nb():
         nbf.v4.new_code_cell(SETUP),
         nbf.v4.new_code_cell(INSTALL.format(n=n)),
         nbf.v4.new_code_cell(FIND_DATA),
-        nbf.v4.new_code_cell(SAVE),
+        nbf.v4.new_code_cell(SAVE.format(limit=0)),
         nbf.v4.new_code_cell('''# ④ (참고용 베이스라인) TF-IDF + Logistic Regression — CPU 로 수 분, PPT 비교용
 import sys; sys.path.insert(0, '/content/DCC/mission3'); os.chdir('/content/DCC/mission3')
 !python baseline_tfidf.py --train_label_dir "$TRAIN_JSON" --val_label_dir "$VAL_JSON"
@@ -105,7 +121,8 @@ import sys, time; sys.path.insert(0, '/content/DCC/mission3'); os.chdir('/conten
 import train
 args = train.get_parser().parse_args([
     '--train_label_dir', TRAIN_JSON, '--ckpt_path', f'{SAVE_DIR}/mission3/mission3.pt',
-    '--limit', str(QUICK_TEST)])
+    '--limit', str(N_LIMIT),
+    '--epochs', '3', '--max_windows', '3'])   # 무료 T4 기준. Colab Pro(A100/L4)면 epochs 4, max_windows 4 권장
 t0 = time.time(); train.main(args); print(f'총 학습 시간 {time.time()-t0:.0f}s')
 '''),
         nbf.v4.new_code_cell('''# ⑥ Validation 추론 (제출 명령어와 동일) + 채점 + 추론 시간 측정
@@ -114,6 +131,7 @@ t0 = time.time(); train.main(args); print(f'총 학습 시간 {time.time()-t0:.0
 !python /content/DCC/tools/evaluate.py --mission 3 --pred /content/DCC/mission3/outputs/mission3.csv --label_dir "$VAL_JSON"
 !cp /content/DCC/mission3/outputs/mission3.csv "$SAVE_DIR/"
 '''),
+        nbf.v4.new_code_cell(DOWNLOAD),
     ]
 
 
@@ -128,6 +146,6 @@ def write(cells, path):
 
 if __name__ == "__main__":
     root = Path(__file__).resolve().parents[1]
-    write(audio_nb(1, "신고자의 성별 분류 (음성 → gender)", ""), root / "mission1/train_mission1.ipynb")
-    write(audio_nb(2, "신고자 / 119대원 발화 분류 (발화 조각 음성 → speaker)", ""), root / "mission2/train_mission2.ipynb")
+    write(audio_nb(1, "신고자의 성별 분류 (음성 → gender)", "", 8000), root / "mission1/train_mission1.ipynb")
+    write(audio_nb(2, "신고자 / 119대원 발화 분류 (발화 조각 음성 → speaker)", "", 6000), root / "mission2/train_mission2.ipynb")
     write(text_nb(), root / "mission3/train_mission3.ipynb")
