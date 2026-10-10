@@ -26,14 +26,16 @@ FIND_DATA = r'''# ② 데이터 폴더 찾기
 import glob, os, zipfile
 DATA_ROOT = '/content/drive/MyDrive/2026 공모전/데이터+AI 크리에이터 캠프/대학부 데이터'
 if not os.path.exists(DATA_ROOT):
-    cands = (glob.glob('/content/drive/MyDrive/*/*/대학부 데이터') + glob.glob('/content/drive/MyDrive/*/대학부 데이터')
-             + glob.glob('/content/drive/MyDrive/**/2026 DCC 대학부 데이터', recursive=True))
+    cands = glob.glob('/content/drive/MyDrive/*/*/대학부 데이터') + glob.glob('/content/drive/MyDrive/*/대학부 데이터')
     DATA_ROOT = cands[0] if cands else DATA_ROOT
 print('DATA_ROOT =', DATA_ROOT, os.path.exists(DATA_ROOT))
 
 def find_dir(prefix):
-    """TS_/TL_/VS_/VL_ 로 시작하는 폴더(또는 zip)를 찾아 경로 반환. zip 이면 로컬 디스크에 압축 해제."""
-    hits = sorted(glob.glob(f'{DATA_ROOT}/**/{prefix}*', recursive=True))
+    """TS_/TL_/VS_/VL_ 로 시작하는 폴더(또는 zip) 경로 반환. (Drive 는 재귀 탐색이 매우 느려서 깊이 3까지만 확인)
+    zip 이면 로컬 디스크에 압축 해제."""
+    hits = []
+    for depth in ('', '*/', '*/*/', '*/*/*/'):
+        hits += sorted(glob.glob(f'{DATA_ROOT}/{depth}{prefix}*'))
     for h in hits:
         if os.path.isdir(h):
             return h
@@ -48,8 +50,8 @@ def find_dir(prefix):
 TRAIN_WAV, TRAIN_JSON = find_dir('TS_'), find_dir('TL_')
 VAL_WAV, VAL_JSON = find_dir('VS_'), find_dir('VL_')
 for k, v in dict(TRAIN_WAV=TRAIN_WAV, TRAIN_JSON=TRAIN_JSON, VAL_WAV=VAL_WAV, VAL_JSON=VAL_JSON).items():
-    n = len(glob.glob(f'{v}/**/*.*', recursive=True)) if v else 0
-    print(f'{k:10s} {v}  ({n} files)')
+    sample = sorted(os.listdir(v))[:3] if v else []
+    print(f'{k:10s} {v}\n           예시: {sample}')
 '''
 
 SAVE = '''# ③ 설정
