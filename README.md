@@ -13,14 +13,14 @@
 - Threshold: 모든 미션 0.5 고정 (2-class softmax argmax = p≥0.5, 증상별 sigmoid ≥ 0.5) — 규정 준수
 - Validation 폴더는 학습·모델 선택에 사용하지 않음 (Training 내부 10% holdout 으로 epoch 선택)
 
-## 실행 순서 (Colab Pro, GPU: L4 권장)
+## 실행 순서 (무료 Colab T4 가능, Pro 면 L4)
 
 0. 공유받은 `대학부 데이터` 폴더를 **내 드라이브에 바로가기 추가** (용량 차지 안 함, 현재 `2026 공모전/데이터+AI 크리에이터 캠프/대학부 데이터`)
 1. 각 미션 폴더의 노트북을 Colab 으로 열기 (GitHub → `BioCode67/DCC`, 브랜치 `ccr-1cdc76be-ibbw6s`)
    - `mission1/train_mission1.ipynb`, `mission2/train_mission2.ipynb`, `mission3/train_mission3.ipynb`
-2. 런타임 → 런타임 유형 변경 → GPU(L4) + 높은 RAM
+2. 런타임 → 런타임 유형 변경 → GPU (무료: T4)
 3. `QUICK_TEST = 200` 으로 한 번 끝까지 실행해서 경로/형식 확인 → `QUICK_TEST = 0` 으로 전체 실행
-4. 체크포인트와 Validation 결과 CSV 는 `내 드라이브/DCC_outputs/` 에 저장됨
+4. 체크포인트와 Validation 결과 CSV 는 `/content/ckpt` 에 저장 → **마지막 셀로 zip 다운로드** (런타임 끊기면 사라짐)
 5. 실행 로그가 남은 노트북을 `파일 → 다운로드 → .ipynb` 로 받아 각 미션 폴더에 넣기 (제출용 학습 로그)
 
 ## 추론 (채점 명령어)
