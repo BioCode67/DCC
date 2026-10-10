@@ -22,12 +22,12 @@ else:
 '''
 
 FIND_DATA = r'''# ② 데이터 폴더 찾기
-#   공유 폴더 '2026 DCC 대학부 데이터' 를 내 드라이브에 '바로가기 추가' 해 두면 아래 경로로 보임.
-#   경로가 다르면 DATA_ROOT 만 고쳐주세요.
+#   공유 폴더 '대학부 데이터' 를 내 드라이브에 '바로가기 추가' 해 둔 경로. 다르면 DATA_ROOT 만 고쳐주세요.
 import glob, os, zipfile
-DATA_ROOT = '/content/drive/MyDrive/2026 학습/2026 DCC 대학부 데이터'
+DATA_ROOT = '/content/drive/MyDrive/2026 공모전/데이터+AI 크리에이터 캠프/대학부 데이터'
 if not os.path.exists(DATA_ROOT):
-    cands = glob.glob('/content/drive/MyDrive/**/2026 DCC 대학부 데이터', recursive=True)
+    cands = (glob.glob('/content/drive/MyDrive/*/*/대학부 데이터') + glob.glob('/content/drive/MyDrive/*/대학부 데이터')
+             + glob.glob('/content/drive/MyDrive/**/2026 DCC 대학부 데이터', recursive=True))
     DATA_ROOT = cands[0] if cands else DATA_ROOT
 print('DATA_ROOT =', DATA_ROOT, os.path.exists(DATA_ROOT))
 

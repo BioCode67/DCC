@@ -15,7 +15,7 @@
 
 ## 실행 순서 (Colab Pro, GPU: L4 권장)
 
-0. 공유받은 `2026 DCC 대학부 데이터` 폴더를 **내 드라이브에 바로가기 추가** (용량 차지 안 함)
+0. 공유받은 `대학부 데이터` 폴더를 **내 드라이브에 바로가기 추가** (용량 차지 안 함, 현재 `2026 공모전/데이터+AI 크리에이터 캠프/대학부 데이터`)
 1. 각 미션 폴더의 노트북을 Colab 으로 열기 (GitHub → `BioCode67/DCC`, 브랜치 `ccr-1cdc76be-ibbw6s`)
    - `mission1/train_mission1.ipynb`, `mission2/train_mission2.ipynb`, `mission3/train_mission3.ipynb`
 2. 런타임 → 런타임 유형 변경 → GPU(L4) + 높은 RAM
